@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Player Selection</h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="selectCategory" class="form-label">Player Category</label>
+                        <select class="form-select" id="selectCategory" onchange="updatePlayerNumbers()">
+                            <option value="batsmen">Batsmen</option>
+                            <option value="bowlers">Bowlers</option>
+                            <option value="wicketkeepers">Wicket Keepers</option>
+                            <option value="allrounders">All Rounders</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="selectNumber" class="form-label">Player Number</label>
+                        <select class="form-select" id="selectNumber">
+                            <option value="">Select Player</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary" onclick="selectPlayer()">Select Player</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Available Players</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <select class="form-select" id="playerCategory" onchange="filterPlayers()">
+                            <option value="batsmen">Batsmen</option>
+                            <option value="bowlers">Bowlers</option>
+                            <option value="wicketkeepers">Wicket Keepers</option>
+                            <option value="allrounders">All Rounders</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select" id="playerStatus" onchange="filterPlayers()">
+                            <option value="all">All Status</option>
+                            <option value="untouched">Available</option>
+                            <option value="sold">Sold</option>
+                            <option value="unsold">Unsold</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="availablePlayersTable">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Name</th>
+                                    <th>Base Price</th>
+                                    <th>Status</th>
+                                    <th>Stats</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playersList">
+                                {% for category, category_players in players.items() %}
+                                {% for player in category_players %}
+                                <tr class="player-row" data-category="{{ category }}" data-status="{{ player.status }}">
+                                    <td>{{ player.player_number }}</td>
+                                    <td>{{ player.name }}</td>
+                                    <td>₹{{ player.base_price }}Cr</td>
+                                    <td>{{ player.status|title }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="showPlayerStats('{{ category }}', {{ player|tojson|safe }})">
+                                            View Stats
+                                        </button>
+                                    </td>
+                                    <td>
+                                        {% if player.status != 'sold' %}
+                                        <button class="btn btn-sm btn-success" onclick="sellPlayer('{{ category }}', '{{ player.name }}')">
+                                            Sell
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Teams Overview</h5>
+                {% for team in teams %}
+                <div class="team-card mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">
+                            <a href="{{ url_for('view_team', team_name=team.name) }}" class="text-decoration-none">
+                                {{ team.name }}
+                            </a>
+                        </h6>
+                    </div>
+                    <p class="mb-2">Remaining Purse: ₹{{ team.purse }}Cr</p>
+                    <div class="row">
+                        <div class="col-6">
+                            <small>Batsmen: {{ team.stats.batsmen_count }}</small>
+                        </div>
+                        <div class="col-6">
+                            <small>Bowlers: {{ team.stats.bowlers_count }}</small>
+                        </div>
+                        <div class="col-6">
+                            <small>Wicket Keepers: {{ team.stats.wicketkeepers_count }}</small>
+                        </div>
+                        <div class="col-6">
+                            <small>All Rounders: {{ team.stats.allrounders_count }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Player Stats Modal -->
+<div class="modal fade" id="playerStatsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Player Statistics</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="playerStatsContent">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Player Selection Modal -->
+<div class="modal fade" id="playerSelectionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Player Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="playerDetailsContent">
+                </div>
+                <div class="mt-4">
+                    <button class="btn btn-success" onclick="markSold()">Mark Sold</button>
+                    <button class="btn btn-danger" onclick="markUnsold()">Mark Unsold</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sell Player Modal -->
+<div class="modal fade" id="sellPlayerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Sell Player</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="sellPlayerForm">
+                    <input type="hidden" id="playerCategory">
+                    <input type="hidden" id="playerName">
+                    <div class="mb-3">
+                        <label for="sellingPrice" class="form-label">Selling Price (in M)</label>
+                        <input type="number" class="form-control" id="sellingPrice" required min="2" step="0.1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="teamSelect" class="form-label">Select Team</label>
+                        <select class="form-select" id="teamSelect" required>
+                            {% for team in teams %}
+                            <option value="{{ team.name }}">{{ team.name }} (₹{{ team.purse }}M)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Confirm Sale</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updatePlayerNumbers() {
+    const category = document.getElementById('selectCategory').value;
+    const numberSelect = document.getElementById('selectNumber');
+    const players = Array.from(document.querySelectorAll('.player-row'))
+        .filter(row => row.dataset.category === category);
+
+    numberSelect.innerHTML = '<option value="">Select Player</option>';
+
+    players.forEach(player => {
+        const number = player.querySelector('td:first-child').textContent;
+        const name = player.querySelector('td:nth-child(2)').textContent;
+        const option = document.createElement('option');
+        option.value = number;
+        option.textContent = `${number} - ${name}`;
+        numberSelect.appendChild(option);
+    });
+}
+
+function filterPlayers() {
+    const category = document.getElementById('playerCategory').value;
+    const status = document.getElementById('playerStatus').value;
+    const rows = document.querySelectorAll('.player-row');
+
+    rows.forEach(row => {
+        const matchCategory = row.dataset.category === category;
+        const matchStatus = status === 'all' || row.dataset.status === status;
+        row.style.display = matchCategory && matchStatus ? '' : 'none';
+    });
+}
+
+function showPlayerStats(category, player) {
+    let statsHtml = `
+        <p><strong>Player Name:</strong> ${player.name}</p>
+        <p><strong>Player Number:</strong> ${player.player_number}</p>
+        <p><strong>Matches:</strong> ${player.stats.matches}</p>
+    `;
+
+    if (['batsmen', 'wicketkeepers', 'allrounders'].includes(category)) {
+        statsHtml += `
+            <p><strong>Runs:</strong> ${player.stats.runs}</p>
+            <p><strong>Average:</strong> ${player.stats.average}</p>
+            <p><strong>Strike Rate:</strong> ${player.stats.strike_rate}</p>
+            <p><strong>Highest Score:</strong> ${player.stats.highest_score}</p>
+            <p><strong>50s:</strong> ${player.stats.fifties}</p>
+            <p><strong>100s:</strong> ${player.stats.hundreds}</p>
+        `;
+    }
+
+    if (['bowlers', 'allrounders'].includes(category)) {
+        statsHtml += `
+            <p><strong>Wickets:</strong> ${player.stats.wickets}</p>
+            <p><strong>Economy:</strong> ${player.stats.economy}</p>
+            <p><strong>Best Bowling:</strong> ${player.stats.best_bowling}</p>
+        `;
+    }
+
+    document.getElementById('playerStatsContent').innerHTML = statsHtml;
+    new bootstrap.Modal(document.getElementById('playerStatsModal')).show();
+}
+
+function selectPlayer() {
+    const category = document.getElementById('selectCategory').value;
+    const number = document.getElementById('selectNumber').value;
+
+    if (!number) {
+        alert('Please select a player first');
+        return;
+    }
+
+    const player = document.querySelector(`.player-row[data-category="${category}"] td:first-child:contains("${number}")`).closest('tr');
+    const playerData = {
+        name: player.querySelector('td:nth-child(2)').textContent,
+        number: number,
+        category: category,
+        base_price: player.querySelector('td:nth-child(3)').textContent
+    };
+
+    showPlayerDetails(category, playerData);
+}
+
+function showPlayerDetails(category, player) {
+    const detailsHtml = `
+        <h6>${player.name} (${player.number})</h6>
+        <p><strong>Category:</strong> ${category}</p>
+        <p><strong>Base Price:</strong> ${player.base_price}</p>
+    `;
+
+    document.getElementById('playerDetailsContent').innerHTML = detailsHtml;
+    new bootstrap.Modal(document.getElementById('playerSelectionModal')).show();
+}
+
+function markSold() {
+    const category = document.getElementById('selectCategory').value;
+    const number = document.getElementById('selectNumber').value;
+    if (!number) return;
+
+    const player = document.querySelector(`.player-row[data-category="${category}"] td:first-child:contains("${number}")`).closest('tr');
+    const playerName = player.querySelector('td:nth-child(2)').textContent;
+
+    bootstrap.Modal.getInstance(document.getElementById('playerSelectionModal')).hide();
+    sellPlayer(category, playerName);
+}
+
+function markUnsold() {
+    const category = document.getElementById('selectCategory').value;
+    const number = document.getElementById('selectNumber').value;
+    if (!number) return;
+
+    const player = document.querySelector(`.player-row[data-category="${category}"] td:first-child:contains("${number}")`).closest('tr');
+    const playerName = player.querySelector('td:nth-child(2)').textContent;
+
+    if (confirm('Mark this player as unsold?')) {
+        fetch(`/api/player/${category}/${playerName}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'unsold' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('playerSelectionModal')).hide();
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+
+function sellPlayer(category, playerName) {
+    document.getElementById('playerCategory').value = category;
+    document.getElementById('playerName').value = playerName;
+    new bootstrap.Modal(document.getElementById('sellPlayerModal')).show();
+}
+
+document.getElementById('sellPlayerForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const category = document.getElementById('playerCategory').value;
+    const playerName = document.getElementById('playerName').value;
+    const price = parseFloat(document.getElementById('sellingPrice').value);
+    const team = document.getElementById('teamSelect').value;
+
+    fetch(`/api/player/${category}/${playerName}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'sold',
+            team: team,
+            price: price
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('sellPlayerModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    updatePlayerNumbers();
+    filterPlayers();
+});
+</script>
+{% endblock %}

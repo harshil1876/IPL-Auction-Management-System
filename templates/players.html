@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">All Players</h5>
+        <a href="/" class="btn btn-primary">Back to Auction</a>
+    </div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="playerTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="batsmen-tab" data-bs-toggle="tab" href="#batsmen" role="tab">Batsmen (1-100)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="bowlers-tab" data-bs-toggle="tab" href="#bowlers" role="tab">Bowlers (101-200)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="wicketkeepers-tab" data-bs-toggle="tab" href="#wicketkeepers" role="tab">Wicket Keepers (201-300)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="allrounders-tab" data-bs-toggle="tab" href="#allrounders" role="tab">All Rounders (301-400)</a>
+            </li>
+        </ul>
+        <div class="tab-content mt-3" id="playerTabsContent">
+            {% for category in ['batsmen', 'bowlers', 'wicketkeepers', 'allrounders'] %}
+            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="{{ category }}" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Number</th>
+                                <th>Name</th>
+                                <th>Matches</th>
+                                {% if category in ['batsmen', 'wicketkeepers', 'allrounders'] %}
+                                <th>Runs</th>
+                                <th>Average</th>
+                                <th>Strike Rate</th>
+                                <th>Highest Score</th>
+                                <th>50s</th>
+                                <th>100s</th>
+                                {% endif %}
+                                {% if category in ['bowlers', 'allrounders'] %}
+                                <th>Wickets</th>
+                                <th>Economy</th>
+                                <th>Best Bowling</th>
+                                {% endif %}
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for player in players[category] %}
+                            <tr>
+                                <td>{{ player.player_number }}</td>
+                                <td>{{ player.name }}</td>
+                                <td>{{ player.stats.matches }}</td>
+                                {% if category in ['batsmen', 'wicketkeepers', 'allrounders'] %}
+                                <td>{{ player.stats.runs }}</td>
+                                <td>{{ player.stats.average }}</td>
+                                <td>{{ player.stats.strike_rate }}</td>
+                                <td>{{ player.stats.highest_score }}</td>
+                                <td>{{ player.stats.fifties }}</td>
+                                <td>{{ player.stats.hundreds }}</td>
+                                {% endif %}
+                                {% if category in ['bowlers', 'allrounders'] %}
+                                <td>{{ player.stats.wickets }}</td>
+                                <td>{{ player.stats.economy }}</td>
+                                <td>{{ player.stats.best_bowling }}</td>
+                                {% endif %}
+                                <td>
+                                    <button class="btn btn-sm btn-danger" onclick="removePlayer('{{ category }}', '{{ player.name }}')">
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+function removePlayer(category, playerName) {
+    if (confirm('Are you sure you want to remove this player? This will also remove them from Available Players.')) {
+        fetch('/api/remove-player-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: category,
+                player: playerName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

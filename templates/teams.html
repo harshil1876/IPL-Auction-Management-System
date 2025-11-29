@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Team Preview</h5>
+        <a href="/" class="btn btn-primary">Back to Auction</a>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for team in teams %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <a href="{{ url_for('view_team', team_name=team.name) }}" class="text-decoration-none">
+                                {{ team.name }}
+                            </a>
+                        </h6>
+                        <div>
+                            <button class="btn btn-sm btn-danger" onclick="resetTeam('{{ team.name }}')">
+                                Reset Team
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p>Remaining Purse: ₹{{ team.purse }}Cr</p>
+
+                        <h6>Batsmen ({{ team.stats.batsmen_count }})</h6>
+                        <div class="player-list mb-3">
+                            {% for player in team.players.batsmen %}
+                            <div class="player-item d-flex justify-content-between align-items-center">
+                                <span>{{ player.name }}</span>
+                                <button class="btn btn-sm btn-danger" onclick="removePlayer('batsmen', '{{ player.name }}', '{{ team.name }}')">
+                                    Remove
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <h6>Bowlers ({{ team.stats.bowlers_count }})</h6>
+                        <div class="player-list mb-3">
+                            {% for player in team.players.bowlers %}
+                            <div class="player-item d-flex justify-content-between align-items-center">
+                                <span>{{ player.name }}</span>
+                                <button class="btn btn-sm btn-danger" onclick="removePlayer('bowlers', '{{ player.name }}', '{{ team.name }}')">
+                                    Remove
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <h6>Wicket Keepers ({{ team.stats.wicketkeepers_count }})</h6>
+                        <div class="player-list mb-3">
+                            {% for player in team.players.wicketkeepers %}
+                            <div class="player-item d-flex justify-content-between align-items-center">
+                                <span>{{ player.name }}</span>
+                                <button class="btn btn-sm btn-danger" onclick="removePlayer('wicketkeepers', '{{ player.name }}', '{{ team.name }}')">
+                                    Remove
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <h6>All Rounders ({{ team.stats.allrounders_count }})</h6>
+                        <div class="player-list">
+                            {% for player in team.players.allrounders %}
+                            <div class="player-item d-flex justify-content-between align-items-center">
+                                <span>{{ player.name }}</span>
+                                <button class="btn btn-sm btn-danger" onclick="removePlayer('allrounders', '{{ player.name }}', '{{ team.name }}')">
+                                    Remove
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+function resetTeam(teamName) {
+    if (confirm(`Are you sure you want to reset ${teamName}? This will remove all players and restore the initial purse.`)) {
+        fetch(`/api/team/${teamName}/reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();  // Reload the page to reflect the changes
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+
+function removePlayer(category, playerName, teamName) {
+    if (confirm(`Remove ${playerName} from ${teamName}?`)) {
+        fetch('/api/remove-player', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: category,
+                player: playerName,
+                team: teamName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">{{ team.name }}</h5>
+        <div>
+            <button class="btn btn-danger" onclick="resetTeam('{{ team.name }}')">Reset Team</button>
+            <a href="{{ url_for('teams') }}" class="btn btn-primary">Back to Teams</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="team-overview mb-4">
+            <h6>Team Overview</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-2"><strong>Remaining Purse:</strong></p>
+                    <h4 class="text-primary">₹{{ team.purse }}Cr</h4>
+                </div>
+                <div class="col-md-9">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Batsmen:</strong></p>
+                            <h5>{{ team.stats.batsmen_count }}</h5>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Bowlers:</strong></p>
+                            <h5>{{ team.stats.bowlers_count }}</h5>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>Wicket Keepers:</strong></p>
+                            <h5>{{ team.stats.wicketkeepers_count }}</h5>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-1"><strong>All Rounders:</strong></p>
+                            <h5>{{ team.stats.allrounders_count }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="team-players">
+            <h6 class="mb-3">Team Players</h6>
+
+            <!-- Batsmen Section -->
+<div class="category-section mb-4">
+    <h6 class="text-primary">Batsmen (1-100)</h6>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>Base Price</th>
+                    <th>Selling Price</th>
+                    <th>Stats</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in team.players.batsmen %}
+                <tr>
+                    <td>{{ player.player_number }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>₹{{ player.base_price }}Cr</td>
+                    <td>₹{{ player.get('selling_price', player.base_price) }}M</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="showPlayerStats('batsmen', {{ player|tojson|safe }})">
+                            View Stats
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="removePlayer('batsmen', '{{ player.name }}', '{{ team.name }}')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Total Money Spent on Batsmen -->
+    <div class="text-end">
+        <strong>Total Spent on Batsmen: ₹{{ total_spent.batsmen }}Cr</strong>
+    </div>
+</div>
+
+<!-- Bowlers Section -->
+<div class="category-section mb-4">
+    <h6 class="text-primary">Bowlers (101-200)</h6>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>Base Price</th>
+                    <th>Selling Price</th>
+                    <th>Stats</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in team.players.bowlers %}
+                <tr>
+                    <td>{{ player.player_number }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>₹{{ player.base_price }}Cr</td>
+                    <td>₹{{ player.get('selling_price', player.base_price) }}M</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="showPlayerStats('bowlers', {{ player|tojson|safe }})">
+                            View Stats
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="removePlayer('bowlers', '{{ player.name }}', '{{ team.name }}')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Total Money Spent on Bowlers -->
+    <div class="text-end">
+        <strong>Total Spent on Bowlers: ₹{{ total_spent.bowlers }}Cr</strong>
+    </div>
+</div>
+
+<!-- Wicket Keepers Section -->
+<div class="category-section mb-4">
+    <h6 class="text-primary">Wicket Keepers (201-300)</h6>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>Base Price</th>
+                    <th>Selling Price</th>
+                    <th>Stats</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in team.players.wicketkeepers %}
+                <tr>
+                    <td>{{ player.player_number }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>₹{{ player.base_price }}M</td>
+                    <td>₹{{ player.get('selling_price', player.base_price) }}Cr</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="showPlayerStats('wicketkeepers', {{ player|tojson|safe }})">
+                            View Stats
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="removePlayer('wicketkeepers', '{{ player.name }}', '{{ team.name }}')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Total Money Spent on Wicket Keepers -->
+    <div class="text-end">
+        <strong>Total Spent on Wicket Keepers: ₹{{ total_spent.wicketkeepers }}Cr</strong>
+    </div>
+</div>
+
+<!-- All Rounders Section -->
+<div class="category-section">
+    <h6 class="text-primary">All Rounders (301-400)</h6>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>Base Price</th>
+                    <th>Selling Price</th>
+                    <th>Stats</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in team.players.allrounders %}
+                <tr>
+                    <td>{{ player.player_number }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>₹{{ player.base_price }}M</td>
+                    <td>₹{{ player.get('selling_price', player.base_price) }}Cr</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="showPlayerStats('allrounders', {{ player|tojson|safe }})">
+                            View Stats
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="removePlayer('allrounders', '{{ player.name }}', '{{ team.name }}')">
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Total Money Spent on All Rounders -->
+    <div class="text-end">
+        <strong>Total Spent on All Rounders: ₹{{ total_spent.allrounders }}Cr</strong>
+    </div>
+</div>
+
+<!-- Total Money Spent on All Categories -->
+<div class="card mt-4">
+    <div class="card-body">
+        <h6 class="text-primary">Total Money Spent</h6>
+        <div class="row">
+            <div class="col-md-3">
+                <p class="mb-1"><strong>Batsmen:</strong> ₹{{ total_spent.batsmen }}Cr</p>
+            </div>
+            <div class="col-md-3">
+                <p class="mb-1"><strong>Bowlers:</strong> ₹{{ total_spent.bowlers }}Cr</p>
+            </div>
+            <div class="col-md-3">
+                <p class="mb-1"><strong>Wicket Keepers:</strong> ₹{{ total_spent.wicketkeepers }}Cr</p>
+            </div>
+            <div class="col-md-3">
+                <p class="mb-1"><strong>All Rounders:</strong> ₹{{ total_spent.allrounders }}Cr</p>
+            </div>
+        </div>
+        <hr>
+        <div class="text-end">
+            <strong>Total Spent: ₹{{ total_spent.overall }}Cr</strong>
+        </div>
+    </div>
+</div>
+
+<!-- Player Stats Modal -->
+<div class="modal fade" id="playerStatsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Player Statistics</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="playerStatsContent">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showPlayerStats(category, player) {
+    let statsHtml = `
+        <p><strong>Matches:</strong> ${player.stats.matches}</p>
+    `;
+
+    if (['batsmen', 'wicketkeepers', 'allrounders'].includes(category)) {
+        statsHtml += `
+            <p><strong>Runs:</strong> ${player.stats.runs}</p>
+            <p><strong>Average:</strong> ${player.stats.average}</p>
+            <p><strong>Strike Rate:</strong> ${player.stats.strike_rate}</p>
+            <p><strong>Highest Score:</strong> ${player.stats.highest_score}</p>
+            <p><strong>50s:</strong> ${player.stats.fifties}</p>
+            <p><strong>100s:</strong> ${player.stats.hundreds}</p>
+        `;
+    }
+
+    if (['bowlers', 'allrounders'].includes(category)) {
+        statsHtml += `
+            <p><strong>Wickets:</strong> ${player.stats.wickets}</p>
+            <p><strong>Economy:</strong> ${player.stats.economy}</p>
+            <p><strong>Best Bowling:</strong> ${player.stats.best_bowling}</p>
+        `;
+    }
+
+    document.getElementById('playerStatsContent').innerHTML = statsHtml;
+    new bootstrap.Modal(document.getElementById('playerStatsModal')).show();
+}
+
+function removePlayer(category, playerName, teamName) {
+    if (confirm(`Remove ${playerName} from ${teamName}?`)) {
+        fetch('/api/remove-player', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: category,
+                player: playerName,
+                team: teamName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+
+function resetTeam(teamName) {
+    if (confirm(`Are you sure you want to reset ${teamName}? This will remove all players and restore the initial purse.`)) {
+        fetch(`/api/team/${teamName}/reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();  // Reload the page to reflect the changes
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

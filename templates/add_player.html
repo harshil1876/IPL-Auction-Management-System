@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Add New Player</h5>
+        <a href="/players" class="btn btn-primary">Back to Players</a>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('add_player') }}" id="playerForm">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="name" class="form-label">Player Name</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="category" class="form-label">Player Category</label>
+                    <select class="form-select" id="category" name="category" required onchange="updateFormFields()">
+                        <option value="">Select Category</option>
+                        <option value="batsmen">Batsman</option>
+                        <option value="bowlers">Bowler</option>
+                        <option value="wicketkeepers">Wicket Keeper</option>
+                        <option value="allrounders">All Rounder</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="base_price" class="form-label">Base Price (in M)</label>
+                    <input type="number" class="form-control" id="base_price" name="base_price" step="0.1" min="0" required>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="matches" class="form-label">Matches Played</label>
+                    <input type="number" class="form-control" id="matches" name="matches" required>
+                </div>
+
+                <!-- Batting Stats -->
+                <div class="batting-stats">
+                    <div class="col-md-6 mb-3">
+                        <label for="runs" class="form-label">Runs Scored</label>
+                        <input type="number" class="form-control" id="runs" name="runs" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="average" class="form-label">Batting Average</label>
+                        <input type="number" class="form-control" id="average" name="average" step="0.01" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="strike_rate" class="form-label">Strike Rate</label>
+                        <input type="number" class="form-control" id="strike_rate" name="strike_rate" step="0.01" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="highest_score" class="form-label">Highest Score</label>
+                        <input type="number" class="form-control" id="highest_score" name="highest_score" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="fifties" class="form-label">Number of 50s</label>
+                        <input type="number" class="form-control" id="fifties" name="fifties" required>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="hundreds" class="form-label">Number of 100s</label>
+                        <input type="number" class="form-control" id="hundreds" name="hundreds" required>
+                    </div>
+                </div>
+
+                <!-- Bowling Stats -->
+                <div class="bowling-stats" style="display: none;">
+                    <div class="col-md-6 mb-3">
+                        <label for="wickets" class="form-label">Wickets Taken</label>
+                        <input type="number" class="form-control" id="wickets" name="wickets" value="0">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="economy" class="form-label">Economy Rate</label>
+                        <input type="number" class="form-control" id="economy" name="economy" step="0.01" value="0">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="best_bowling" class="form-label">Best Bowling Figures (e.g., 4/25)</label>
+                        <input type="text" class="form-control" id="best_bowling" name="best_bowling" placeholder="0/0">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Player</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function updateFormFields() {
+    const category = document.getElementById('category').value;
+    const battingStats = document.querySelector('.batting-stats');
+    const bowlingStats = document.querySelector('.bowling-stats');
+
+    // Reset required attributes
+    const battingInputs = battingStats.querySelectorAll('input');
+    const bowlingInputs = bowlingStats.querySelectorAll('input');
+
+    battingInputs.forEach(input => input.required = false);
+    bowlingInputs.forEach(input => input.required = false);
+
+    switch(category) {
+        case 'batsmen':
+            battingStats.style.display = 'block';
+            bowlingStats.style.display = 'none';
+            battingInputs.forEach(input => input.required = true);
+            break;
+        case 'bowlers':
+            battingStats.style.display = 'none';
+            bowlingStats.style.display = 'block';
+            bowlingInputs.forEach(input => input.required = true);
+            break;
+        case 'wicketkeepers':
+            battingStats.style.display = 'block';
+            bowlingStats.style.display = 'none';
+            battingInputs.forEach(input => input.required = true);
+            break;
+        case 'allrounders':
+            battingStats.style.display = 'block';
+            bowlingStats.style.display = 'block';
+            battingInputs.forEach(input => input.required = true);
+            bowlingInputs.forEach(input => input.required = true);
+            break;
+        default:
+            battingStats.style.display = 'none';
+            bowlingStats.style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', updateFormFields);
+</script>
+{% endblock %}
+ 

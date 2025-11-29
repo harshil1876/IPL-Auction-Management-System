@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Team Evaluation</h5>
+        <a href="/" class="btn btn-primary">Back to Auction</a>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for team in teams %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="mb-0">{{ team.name }}</h6>
+                        <small class="text-muted">Overall Grade: {{ evaluations[team.name].grade }}</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6>Score: {{ evaluations[team.name].score }}/100</h6>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: {{ evaluations[team.name].score }}%"
+                                     aria-valuenow="{{ evaluations[team.name].score }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6 class="text-success">Strengths:</h6>
+                            <ul class="list-unstyled">
+                                {% for strength in evaluations[team.name].strengths %}
+                                <li><i class="fas fa-check text-success me-2"></i>{{ strength }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6 class="text-danger">Areas for Improvement:</h6>
+                            <ul class="list-unstyled">
+                                {% for weakness in evaluations[team.name].weaknesses %}
+                                <li><i class="fas fa-exclamation-triangle text-danger me-2"></i>{{ weakness }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+
+                        <div class="stats">
+                            <h6>Team Composition:</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <p class="mb-1">Batsmen: {{ evaluations[team.name].stats.batsmen_count }}</p>
+                                    <p class="mb-1">Bowlers: {{ evaluations[team.name].stats.bowlers_count }}</p>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-1">Wicket Keepers: {{ evaluations[team.name].stats.wicketkeepers_count }}</p>
+                                    <p class="mb-1">All Rounders: {{ evaluations[team.name].stats.allrounders_count }}</p>
+                                </div>
+                            <!-- </div> -->
+                            <!-- <p class="mt-2">Remaining Purse: ₹{{ team.purse }}M</p> -->
+                        <!-- </div> -->
+
+                        <!-- Category-Specific Stats -->
+                        <!-- <div class="stats"> -->
+                            <!-- <h6>Team Stats by Category:</h6> -->
+<!--  -->
+                            <!-- Batsmen Stats -->
+                            <!-- <div class="category-stats mb-4"> -->
+                                <!-- <h6 class="text-primary">Batsmen Stats</h6> -->
+                                <!-- <div class="row"> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total Runs: {{ evaluations[team.name].stats.total_runs_batsmen | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Average Runs: {{ evaluations[team.name].stats.avg_runs_batsmen | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Batting Average: {{ evaluations[team.name].stats.avg_average_batsmen | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Strike Rate: {{ evaluations[team.name].stats.avg_strike_rate_batsmen | default(0) | round(2) }}</p> -->
+                                    <!-- </div> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total 50s: {{ evaluations[team.name].stats.total_fifties_batsmen | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Total 100s: {{ evaluations[team.name].stats.total_hundreds_batsmen | default(0) }}</p> -->
+                                    <!-- </div> -->
+                                <!-- </div> -->
+                            <!-- </div> -->
+<!--  -->
+                            <!-- Bowlers Stats -->
+                            <!-- <div class="category-stats mb-4"> -->
+                                <!-- <h6 class="text-primary">Bowlers Stats</h6> -->
+                                <!-- <div class="row"> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total Wickets: {{ evaluations[team.name].stats.total_wickets_bowlers | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Average Economy: {{ evaluations[team.name].stats.avg_economy_bowlers | default(0) | round(2) }}</p> -->
+                                    <!-- </div> -->
+                                <!-- </div> -->
+                            <!-- </div> -->
+<!--  -->
+                            <!-- Wicketkeepers Stats -->
+                            <!-- <div class="category-stats mb-4"> -->
+                                <!-- <h6 class="text-primary">Wicketkeepers Stats</h6> -->
+                                <!-- <div class="row"> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total Runs: {{ evaluations[team.name].stats.total_runs_wicketkeepers | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Average Runs: {{ evaluations[team.name].stats.avg_runs_wicketkeepers | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Batting Average: {{ evaluations[team.name].stats.avg_average_wicketkeepers | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Strike Rate: {{ evaluations[team.name].stats.avg_strike_rate_wicketkeepers | default(0) | round(2) }}</p> -->
+                                    <!-- </div> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total 50s: {{ evaluations[team.name].stats.total_fifties_wicketkeepers | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Total 100s: {{ evaluations[team.name].stats.total_hundreds_wicketkeepers | default(0) }}</p> -->
+                                    <!-- </div> -->
+                                <!-- </div> -->
+                            <!-- </div> -->
+<!--  -->
+                            <!-- All-Rounders Stats -->
+                            <!-- <div class="category-stats"> -->
+                                <!-- <h6 class="text-primary">All-Rounders Stats</h6> -->
+                                <!-- <div class="row"> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total Runs: {{ evaluations[team.name].stats.total_runs_allrounders | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Average Runs: {{ evaluations[team.name].stats.avg_runs_allrounders | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Batting Average: {{ evaluations[team.name].stats.avg_average_allrounders | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Strike Rate: {{ evaluations[team.name].stats.avg_strike_rate_allrounders | default(0) | round(2) }}</p> -->
+                                    <!-- </div> -->
+                                    <!-- <div class="col-6"> -->
+                                        <!-- <p class="mb-1">Total Wickets: {{ evaluations[team.name].stats.total_wickets_allrounders | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Average Economy: {{ evaluations[team.name].stats.avg_economy_allrounders | default(0) | round(2) }}</p> -->
+                                        <!-- <p class="mb-1">Total 50s: {{ evaluations[team.name].stats.total_fifties_allrounders | default(0) }}</p> -->
+                                        <!-- <p class="mb-1">Total 100s: {{ evaluations[team.name].stats.total_hundreds_allrounders | default(0) }}</p> -->
+                                    <!-- </div> -->
+                                <!-- </div> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
