@@ -40,7 +40,7 @@ body.dark-theme {
 .dark-theme .card {
     background-color: #1e1e1e;
     border-color: #333;
-    box-shadow: 0 4px 8px rgba(255,255,255,0.1);
+    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
 }
 
 .dark-theme .nav-tabs .nav-link {
@@ -83,10 +83,21 @@ body.dark-theme {
 }
 
 /* Team specific styles */
-.team-mumbai-indians { color: var(--mi-blue); }
-.team-chennai-superkings { color: var(--csk-yellow); }
-.team-royal-challengers { color: var(--rcb-red); }
-.team-kolkata-knights { color: var(--kkr-purple); }
+.team-mumbai-indians {
+    color: var(--mi-blue);
+}
+
+.team-chennai-superkings {
+    color: var(--csk-yellow);
+}
+
+.team-royal-challengers {
+    color: var(--rcb-red);
+}
+
+.team-kolkata-knights {
+    color: var(--kkr-purple);
+}
 
 /* Navigation and header styles */
 .navbar {
@@ -133,22 +144,70 @@ body.dark-theme {
 .player-item {
     padding: 8px;
     margin-bottom: 4px;
-    background-color: rgba(0,0,0,0.05);
+    background-color: rgba(0, 0, 0, 0.05);
     border-radius: 4px;
 }
 
 .card {
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }
 
 .team-card {
     padding: 15px;
     border-radius: 8px;
-    background-color: rgba(0,0,0,0.05);
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .nav-tabs .nav-link {
     color: var(--text-light);
+}
+
+/* Dark theme table styles */
+.dark-theme .table {
+    color: var(--text-dark);
+    --bs-table-color: var(--text-dark);
+    --bs-table-hover-color: var(--text-dark);
+}
+
+.dark-theme .table th,
+.dark-theme .table td {
+    color: var(--text-dark);
+    border-color: #333;
+}
+
+.dark-theme .table-striped>tbody>tr:nth-of-type(odd)>* {
+    color: var(--text-dark);
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.05);
+}
+
+.dark-theme .table-hover>tbody>tr:hover>* {
+    color: var(--text-dark);
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure card titles and labels are also white */
+.dark-theme .card-title,
+.dark-theme .form-label,
+.dark-theme h5,
+.dark-theme h6,
+.dark-theme p {
+    color: var(--text-dark);
+}
+
+/* Dark theme modal styles */
+.dark-theme .modal-content {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    color: var(--text-dark);
+}
+
+.dark-theme .modal-header,
+.dark-theme .modal-footer {
+    border-color: #333;
+}
+
+.dark-theme .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
 }
