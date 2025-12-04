@@ -8,16 +8,20 @@
     <div class="card-body">
         <ul class="nav nav-tabs" id="playerTabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="batsmen-tab" data-bs-toggle="tab" href="#batsmen" role="tab">Batsmen (1-100)</a>
+                <a class="nav-link active" id="batsmen-tab" data-bs-toggle="tab" href="#batsmen" role="tab">Batsmen
+                    (1-100)</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="bowlers-tab" data-bs-toggle="tab" href="#bowlers" role="tab">Bowlers (101-200)</a>
+                <a class="nav-link" id="bowlers-tab" data-bs-toggle="tab" href="#bowlers" role="tab">Bowlers
+                    (101-200)</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="wicketkeepers-tab" data-bs-toggle="tab" href="#wicketkeepers" role="tab">Wicket Keepers (201-300)</a>
+                <a class="nav-link" id="wicketkeepers-tab" data-bs-toggle="tab" href="#wicketkeepers" role="tab">Wicket
+                    Keepers (201-300)</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="allrounders-tab" data-bs-toggle="tab" href="#allrounders" role="tab">All Rounders (301-400)</a>
+                <a class="nav-link" id="allrounders-tab" data-bs-toggle="tab" href="#allrounders" role="tab">All
+                    Rounders (301-400)</a>
             </li>
         </ul>
         <div class="tab-content mt-3" id="playerTabsContent">
@@ -66,7 +70,12 @@
                                 <td>{{ player.stats.best_bowling }}</td>
                                 {% endif %}
                                 <td>
-                                    <button class="btn btn-sm btn-danger" onclick="removePlayer('{{ category }}', '{{ player.name }}')">
+                                    <button class="btn btn-sm btn-primary me-1" data-category="{{ category }}"
+                                        data-player="{{ player|tojson|forceescape }}" onclick="openUpdateModal(this)">
+                                        Update
+                                    </button>
+                                    <button class="btn btn-sm btn-danger"
+                                        onclick="removePlayer('{{ category }}', '{{ player.name }}')">
                                         Remove
                                     </button>
                                 </td>
@@ -81,26 +90,190 @@
     </div>
 </div>
 
+<!-- Update Player Modal -->
+<div class="modal fade" id="updatePlayerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Player Stats</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updatePlayerForm">
+                    <input type="hidden" id="updateCategory">
+                    <input type="hidden" id="updateOriginalName">
+
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" id="updateName" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Matches</label>
+                        <input type="number" class="form-control" id="updateMatches" required>
+                    </div>
+
+                    <div id="battingStats" style="display: none;">
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Runs</label>
+                                <input type="number" class="form-control" id="updateRuns">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Average</label>
+                                <input type="number" step="0.01" class="form-control" id="updateAverage">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Strike Rate</label>
+                                <input type="number" step="0.01" class="form-control" id="updateStrikeRate">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Highest Score</label>
+                                <input type="number" class="form-control" id="updateHighest">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">50s</label>
+                                <input type="number" class="form-control" id="updateFifties">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">100s</label>
+                                <input type="number" class="form-control" id="updateHundreds">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="bowlingStats" style="display: none;">
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Wickets</label>
+                                <input type="number" class="form-control" id="updateWickets">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Economy</label>
+                                <input type="number" step="0.01" class="form-control" id="updateEconomy">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Best Bowling</label>
+                                <input type="text" class="form-control" id="updateBestBowling">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-function removePlayer(category, playerName) {
-    if (confirm('Are you sure you want to remove this player? This will also remove them from Available Players.')) {
-        fetch('/api/remove-player-all', {
+    function removePlayer(category, playerName) {
+        if (confirm('Are you sure you want to remove this player? This will also remove them from Available Players.')) {
+            fetch('/api/remove-player-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    category: category,
+                    player: playerName
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+        }
+    }
+
+    function openUpdateModal(button) {
+        const category = button.getAttribute('data-category');
+        const player = JSON.parse(button.getAttribute('data-player'));
+
+        document.getElementById('updateCategory').value = category;
+        document.getElementById('updateOriginalName').value = player.name;
+        document.getElementById('updateName').value = player.name;
+        document.getElementById('updateMatches').value = player.stats.matches;
+
+        // Show/Hide fields based on category
+        const battingStats = document.getElementById('battingStats');
+        const bowlingStats = document.getElementById('bowlingStats');
+
+        if (['batsmen', 'wicketkeepers', 'allrounders'].includes(category)) {
+            battingStats.style.display = 'block';
+            document.getElementById('updateRuns').value = player.stats.runs;
+            document.getElementById('updateAverage').value = player.stats.average;
+            document.getElementById('updateStrikeRate').value = player.stats.strike_rate;
+            document.getElementById('updateHighest').value = player.stats.highest_score;
+            document.getElementById('updateFifties').value = player.stats.fifties;
+            document.getElementById('updateHundreds').value = player.stats.hundreds;
+        } else {
+            battingStats.style.display = 'none';
+        }
+
+        if (['bowlers', 'allrounders'].includes(category)) {
+            bowlingStats.style.display = 'block';
+            document.getElementById('updateWickets').value = player.stats.wickets;
+            document.getElementById('updateEconomy').value = player.stats.economy;
+            document.getElementById('updateBestBowling').value = player.stats.best_bowling;
+        } else {
+            bowlingStats.style.display = 'none';
+        }
+
+        new bootstrap.Modal(document.getElementById('updatePlayerModal')).show();
+    }
+
+    document.getElementById('updatePlayerForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const category = document.getElementById('updateCategory').value;
+        const originalName = document.getElementById('updateOriginalName').value;
+
+        const updates = {
+            name: document.getElementById('updateName').value,
+            stats: {
+                matches: parseInt(document.getElementById('updateMatches').value)
+            }
+        };
+
+        if (['batsmen', 'wicketkeepers', 'allrounders'].includes(category)) {
+            Object.assign(updates.stats, {
+                runs: parseInt(document.getElementById('updateRuns').value),
+                average: parseFloat(document.getElementById('updateAverage').value),
+                strike_rate: parseFloat(document.getElementById('updateStrikeRate').value),
+                highest_score: parseInt(document.getElementById('updateHighest').value),
+                fifties: parseInt(document.getElementById('updateFifties').value),
+                hundreds: parseInt(document.getElementById('updateHundreds').value)
+            });
+        }
+
+        if (['bowlers', 'allrounders'].includes(category)) {
+            Object.assign(updates.stats, {
+                wickets: parseInt(document.getElementById('updateWickets').value),
+                economy: parseFloat(document.getElementById('updateEconomy').value),
+                best_bowling: document.getElementById('updateBestBowling').value
+            });
+        }
+
+        fetch('/api/update-player', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 category: category,
-                player: playerName
+                original_name: originalName,
+                updates: updates
             })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.error);
-            }
-        });
-    }
-}
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error updating player: ' + data.error);
+                }
+            });
+    });
 </script>
 {% endblock %}

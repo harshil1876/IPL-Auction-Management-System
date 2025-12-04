@@ -396,6 +396,62 @@ def remove_player():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/update-player', methods=['POST'])
+def update_player():
+    try:
+        data = request.json
+        category = data.get('category')
+        original_name = data.get('original_name')
+        updates = data.get('updates', {})
+
+        if not all([category, original_name, updates]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        players = load_players()
+        teams = load_teams()
+        
+        updated = False
+
+        # 1. Update in all_players
+        if category in players['all_players']:
+            for p in players['all_players'][category]:
+                if p['name'] == original_name:
+                    p.update(updates)
+                    # If name changed, we need to be careful, but for now assuming name might change
+                    updated = True
+                    break
+
+        # 2. Update in available_players
+        if category in players['available_players']:
+            for p in players['available_players'][category]:
+                if p['name'] == original_name:
+                    p.update(updates)
+                    updated = True
+                    break
+
+        # 3. Update in teams
+        for team in teams:
+            if category in team['players']:
+                for p in team['players'][category]:
+                    if p['name'] == original_name:
+                        # Preserve selling price if it exists and not in updates
+                        selling_price = p.get('selling_price')
+                        p.update(updates)
+                        if selling_price:
+                            p['selling_price'] = selling_price
+                        updated = True
+                        break
+
+        if updated:
+            save_players(players)
+            save_teams(teams)
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Player not found'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/evaluation')
 def evaluation():
     """Team evaluation page showing analysis of all teams"""
