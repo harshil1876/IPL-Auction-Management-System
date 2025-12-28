@@ -10,7 +10,7 @@
         </div>
         <div>
             <button class="btn btn-secondary me-2" data-team-name="{{ team.name }}"
-                data-owner-name="{{ team.get('owner_name', '') }}" onclick="editTeam(this)">Edit</button>
+                data-owner-name="{{ team.owner_name or '' }}" onclick="editTeam(this)">Edit</button>
             <button class="btn btn-success me-2" data-team-name="{{ team.name }}" data-purse="{{ team.purse }}"
                 onclick="addPurse(this)">Add Purse</button>
             <button class="btn btn-warning me-2" data-team-name="{{ team.name }}" onclick="resetTeam(this)">Reset
@@ -75,10 +75,11 @@
                                 <td>{{ player.player_number }}</td>
                                 <td>{{ player.name }}</td>
                                 <td>₹{{ player.base_price }}Cr</td>
-                                <td>₹{{ player.get('selling_price', player.base_price) }}M</td>
+                                <td>₹{{ player.selling_price or player.base_price }}M</td>
                                 <td>
                                     <button class="btn btn-sm btn-info" data-category="batsmen"
-                                        data-player="{{ player|tojson|forceescape }}" onclick="showPlayerStats(this)">
+                                        data-player="{{ player.to_dict()|tojson|forceescape }}"
+                                        onclick="showPlayerStats(this)">
                                         View Stats
                                     </button>
                                 </td>
@@ -120,10 +121,11 @@
                                 <td>{{ player.player_number }}</td>
                                 <td>{{ player.name }}</td>
                                 <td>₹{{ player.base_price }}Cr</td>
-                                <td>₹{{ player.get('selling_price', player.base_price) }}M</td>
+                                <td>₹{{ player.selling_price or player.base_price }}M</td>
                                 <td>
                                     <button class="btn btn-sm btn-info" data-category="bowlers"
-                                        data-player="{{ player|tojson|forceescape }}" onclick="showPlayerStats(this)">
+                                        data-player="{{ player.to_dict()|tojson|forceescape }}"
+                                        onclick="showPlayerStats(this)">
                                         View Stats
                                     </button>
                                 </td>
@@ -165,10 +167,11 @@
                                 <td>{{ player.player_number }}</td>
                                 <td>{{ player.name }}</td>
                                 <td>₹{{ player.base_price }}M</td>
-                                <td>₹{{ player.get('selling_price', player.base_price) }}Cr</td>
+                                <td>₹{{ player.selling_price or player.base_price }}Cr</td>
                                 <td>
                                     <button class="btn btn-sm btn-info" data-category="wicketkeepers"
-                                        data-player="{{ player|tojson|forceescape }}" onclick="showPlayerStats(this)">
+                                        data-player="{{ player.to_dict()|tojson|forceescape }}"
+                                        onclick="showPlayerStats(this)">
                                         View Stats
                                     </button>
                                 </td>
@@ -210,10 +213,11 @@
                                 <td>{{ player.player_number }}</td>
                                 <td>{{ player.name }}</td>
                                 <td>₹{{ player.base_price }}M</td>
-                                <td>₹{{ player.get('selling_price', player.base_price) }}Cr</td>
+                                <td>₹{{ player.selling_price or player.base_price }}Cr</td>
                                 <td>
                                     <button class="btn btn-sm btn-info" data-category="allrounders"
-                                        data-player="{{ player|tojson|forceescape }}" onclick="showPlayerStats(this)">
+                                        data-player="{{ player.to_dict()|tojson|forceescape }}"
+                                        onclick="showPlayerStats(this)">
                                         View Stats
                                     </button>
                                 </td>

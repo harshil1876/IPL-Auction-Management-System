@@ -1,70 +1,49 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for, flash
-import json
 import os
-from datetime import datetime
+from dotenv import load_dotenv
+from models import db, Team, Player, BidHistory, Batsman, Bowler, WicketKeeper, AllRounder
+from sqlalchemy import func
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default-secret-key")
 
-def load_players():
-    """Load players data from JSON file with error handling"""
-    try:
-        with open('data/players.json', 'r') as f:
-            data = json.load(f)
-            # Ensure the required structure exists
-            if 'all_players' not in data:
-                data['all_players'] = {'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []}
-            if 'available_players' not in data:
-                data['available_players'] = {'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []}
-            return data
-    except (FileNotFoundError, json.JSONDecodeError):
-        default_data = {
-            'all_players': {'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []},
-            'available_players': {'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []}
-        }
-        save_players(default_data)
-        return default_data
+# Database Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SUPABASE_DB_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-def save_players(players_data):
-    """Save players data to JSON file"""
-    with open('data/players.json', 'w') as f:
-        json.dump(players_data, f, indent=4)
-
-def load_teams():
-    """Load teams data from JSON file with error handling"""
-    try:
-        with open('data/teams.json', 'r') as f:
-            data = json.load(f)
-            return data.get('teams', [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        print("Teams data file not found or invalid")
-        return []
-
-def save_teams(teams_data):
-    """Save teams data to JSON file"""
-    with open('data/teams.json', 'w') as f:
-        json.dump({'teams': teams_data}, f, indent=4)
+db.init_app(app)
 
 @app.route('/')
 def index():
     """Home page with player selection and teams overview"""
-    players_data = load_players()
-    teams_data = load_teams()
-
-    # Process and sort available players for each category
-    available_players = {}
-    for category in players_data['available_players']:
-        players = players_data['available_players'][category]
-        # Ensure each player has required attributes
-        for player in players:
-            if 'player_number' not in player:
-                player['player_number'] = 0  # Default value
-            if 'status' not in player:
-                player['status'] = 'untouched'
-            if 'base_price' not in player:
-                player['base_price'] = 5.0
-        # Sort players by number
-        available_players[category] = sorted(players, key=lambda x: x.get('player_number', 0))
+    teams_data = Team.query.all()
+    
+    # Process available players
+    # Fetch ALL players so frontend can filter by status (Available, Sold, Unsold)
+    available_players_query = Player.query.all()
+    
+    available_players = {
+        'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []
+    }
+    
+    for player in available_players_query:
+        # Group by category
+        cat = player.category
+        if cat in available_players:
+            # Convert to dict for template if needed, or pass object
+            # Template expects player['name'], player['base_price'], etc.
+            # Start strict: DB objects can be accessed like attributes
+            # BUT existing templates use dict syntax {{ player.name }} works for both IF access is attribute-like
+            # Jinja2 handles dot notation for both dict keys and object attributes transparently.
+            # Except if template uses player['name'] explicitly.
+            # Let's check templates later. Safe bet is objects.
+            available_players[cat].append(player)
+            
+    # Sort by number
+    for cat in available_players:
+        available_players[cat].sort(key=lambda x: x.player_number or 0)
 
     return render_template('index.html', 
                          players=available_players, 
@@ -73,139 +52,161 @@ def index():
 @app.route('/teams')
 def teams():
     """Teams page showing detailed team information"""
-    teams_data = load_teams()
+    teams_data = Team.query.all()
     return render_template('teams.html', teams=teams_data)
 
 @app.route('/players')
 def players():
     """View all players page"""
-    players_data = load_players()
-    all_players = {category: sorted(players_data['all_players'][category], key=lambda x: x.get('player_number', 0))
-                   for category in players_data['all_players']}
+    all_players_query = Player.query.all()
+    all_players = {
+        'batsmen': [], 'bowlers': [], 'wicketkeepers': [], 'allrounders': []
+    }
+    for player in all_players_query:
+        if player.category in all_players:
+            all_players[player.category].append(player)
+            
+    for cat in all_players:
+        all_players[cat].sort(key=lambda x: x.player_number or 0)
+        
     return render_template('players.html', players=all_players)
 
 @app.route('/team/<team_name>')
 def view_team(team_name):
     """View specific team details"""
-    teams_data = load_teams()
-    team = next((t for t in teams_data if t['name'] == team_name), None)
+    team = Team.query.filter_by(name=team_name).first()
     if team:
-        # Calculate total money spent for each category
+        # Calculate money spent
         total_spent = {
-            'batsmen': sum(player.get('selling_price', player['base_price']) for player in team['players']['batsmen']),
-            'bowlers': sum(player.get('selling_price', player['base_price']) for player in team['players']['bowlers']),
-            'wicketkeepers': sum(player.get('selling_price', player['base_price']) for player in team['players']['wicketkeepers']),
-            'allrounders': sum(player.get('selling_price', player['base_price']) for player in team['players']['allrounders']),
+            'batsmen': 0, 'bowlers': 0, 'wicketkeepers': 0, 'allrounders': 0, 'overall': 0
         }
-        # Calculate overall total
-        total_spent['overall'] = sum(total_spent.values())
+        
+        for player in team.all_players:
+            price = player.selling_price or player.base_price
+            cat = player.category
+            if cat in total_spent:
+                total_spent[cat] += price
+                total_spent['overall'] += price
+        
         return render_template('team_detail.html', team=team, total_spent=total_spent)
     return redirect(url_for('teams'))
-    return render_template('team_detail.html', team=team)
-    return redirect(url_for('teams'))
-
-#def evaluate_team(team):
-#    """Calculate team score and analysis based on player composition"""
-#    score = 0
-#    strengths = []
-#    weaknesses = []
-#
-#    # Evaluate batting strength
-#    if team['stats']['batsmen_count'] >= 4:
-#        score += 5
-#        strengths.append(f"Strong batting lineup with {team['stats']['batsmen_count']} batsmen")
-#    else:
-#        weaknesses.append(f"Need more specialist batsmen (currently {team['stats']['batsmen_count']})")
-#
-#    # Evaluate bowling strength
-#    if team['stats']['bowlers_count'] >= 4:
-#        score += 5
-#        strengths.append(f"Well-rounded bowling attack with {team['stats']['bowlers_count']} bowlers")
-#    else:
-#        weaknesses.append(f"Bowling attack needs strengthening (currently {team['stats']['bowlers_count']})")
-#
-#    # Evaluate wicketkeeper presence
-#    if team['stats']['wicketkeepers_count'] >= 1:
-#        score += 5
-#        strengths.append(f"Has {team['stats']['wicketkeepers_count']} dedicated wicketkeeper(s)")
-#    else:
-#        weaknesses.append("Missing specialist wicketkeeper")
-#
-#    # Evaluate all-rounders
-#    if team['stats']['allrounders_count'] >= 2:
-#        score += 5
-#        strengths.append(f"Good balance with {team['stats']['allrounders_count']} all-rounders")
-#    else:
-#        weaknesses.append(f"Need more all-rounders for team balance (currently {team['stats']['allrounders_count']})")
-#
-#    # Evaluate budget management
-#    #if team['purse'] > 30:
-#    #    score += 20
-#    #    strengths.append(f"Good budget management (₹{team['purse']}M remaining)")
-#    #else:
-#    #    weaknesses.append(f"Limited budget remaining (₹{team['purse']}M)")
-#
-#    return {
-#        'score': score,
-#        'grade': 'A+' if score >= 18 else 'A' if score >= 15 else 'B' if score >= 12 else 'C' if score >= 9 else 'D',
-#        'strengths': strengths,
-#        'weaknesses': weaknesses,
-#        'stats': team['stats']
-#    }
 
 @app.route('/add-player', methods=['GET', 'POST'])
 def add_player():
     if request.method == 'POST':
         try:
             category = request.form.get('category')
+            print(f"DEBUG: Adding player. Category: {category}, Name: {request.form.get('name')}")
+            
+            # Simple Validation
             if not category or category not in ['batsmen', 'bowlers', 'wicketkeepers', 'allrounders']:
+                print(f"DEBUG: Invalid category '{category}'")
                 flash('Invalid player category', 'error')
                 return redirect(url_for('add_player'))
 
-            players = load_players()
-
+            # Calculate next number
+            # Query max player number in this category
+            # Calculate next player number (Gap Filling)
             start_number = {
-                'batsmen': 1,
-                'bowlers': 101,
-                'wicketkeepers': 201,
-                'allrounders': 301
+                'batsmen': 1, 'bowlers': 101, 'wicketkeepers': 201, 'allrounders': 301
             }.get(category, 1)
 
-            existing_numbers = [p.get('player_number', 0) for p in players['all_players'][category]]
-            next_number = max([num for num in existing_numbers if num >= start_number] or [start_number - 1]) + 1
+            # Get all existing numbers for this category
+            existing_numbers = set(p.player_number for p in Player.query.filter_by(type=category).all() if p.player_number)
+            
+            next_number = start_number
+            while next_number in existing_numbers:
+                next_number += 1
+            
+            print(f"DEBUG: Calculated Gap-Filling Player Number: {next_number}")
 
-            # Get base price from the form input
-            base_price = float(request.form.get('base_price', 0))  # Default to 0 if not provided
-            if base_price <= 0:
-                flash('Base price must be greater than 0', 'error')
+            base_price = float(request.form.get('base_price', 0))
+            if base_price < 0:
+                flash('Base price cannot be negative', 'error')
                 return redirect(url_for('add_player'))
 
-            player_data = {
-                'player_number': next_number,
-                'name': request.form.get('name'),
-                'base_price': base_price,  # Use the base price from the form
-                'status': 'available',
-                'stats': {
-                    'matches': int(request.form.get('matches', 0)),
-                    'runs': int(request.form.get('runs', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'average': float(request.form.get('average', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'strike_rate': float(request.form.get('strike_rate', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'highest_score': int(request.form.get('highest_score', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'fifties': int(request.form.get('fifties', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'hundreds': int(request.form.get('hundreds', 0)) if category in ['batsmen', 'wicketkeepers', 'allrounders'] else 0,
-                    'wickets': int(request.form.get('wickets', 0)) if category in ['bowlers', 'allrounders'] else 0,
-                    'economy': float(request.form.get('economy', 0)) if category in ['bowlers', 'allrounders'] else 0,
-                    'best_bowling': request.form.get('best_bowling', '0/0') if category in ['bowlers', 'allrounders'] else ''
-                }
-            }
+            # Calculate lowest available ID (Gap Filling)
+            # Fetch all existing IDs
+            existing_ids = [p.id for p in Player.query.all()]
+            new_id = 1
+            while new_id in existing_ids:
+                new_id += 1
+            
 
-            players['all_players'][category].append(player_data)
-            players['available_players'][category].append(player_data.copy())
-            save_players(players)
+
+            # Create specific player instance based on category
+            if category == 'batsmen':
+                player = Batsman(
+                    id=new_id,
+                    name=request.form.get('name'),
+                    player_name=request.form.get('name'), # Denormalized
+                    player_number=next_number,
+                    base_price=base_price,
+                    status='untouched',
+                    matches=int(request.form.get('matches') or 0),
+                    runs=int(request.form.get('runs') or 0),
+                    average=float(request.form.get('average') or 0),
+                    strike_rate=float(request.form.get('strike_rate') or 0),
+                    highest_score=int(request.form.get('highest_score') or 0),
+                    fifties=int(request.form.get('fifties') or 0),
+                    hundreds=int(request.form.get('hundreds') or 0)
+                )
+            elif category == 'bowlers':
+                player = Bowler(
+                    id=new_id,
+                    name=request.form.get('name'),
+                    player_name=request.form.get('name'), # Denormalized
+                    player_number=next_number,
+                    base_price=base_price,
+                    status='untouched',
+                    matches=int(request.form.get('matches') or 0),
+                    wickets=int(request.form.get('wickets') or 0),
+                    economy=float(request.form.get('economy') or 0),
+                    best_bowling=request.form.get('best_bowling') or '0/0'
+                )
+            elif category == 'wicketkeepers':
+                player = WicketKeeper(
+                    id=new_id,
+                    name=request.form.get('name'),
+                    player_name=request.form.get('name'), # Denormalized
+                    player_number=next_number,
+                    base_price=base_price,
+                    status='untouched',
+                    matches=int(request.form.get('matches') or 0),
+                    runs=int(request.form.get('runs') or 0),
+                    average=float(request.form.get('average') or 0),
+                    strike_rate=float(request.form.get('strike_rate') or 0),
+                    highest_score=int(request.form.get('highest_score') or 0),
+                    fifties=int(request.form.get('fifties') or 0),
+                    hundreds=int(request.form.get('hundreds') or 0)
+                )
+            elif category == 'allrounders':
+                player = AllRounder(
+                    id=new_id,
+                    name=request.form.get('name'),
+                    player_name=request.form.get('name'), # Denormalized
+                    player_number=next_number,
+                    base_price=base_price,
+                    status='untouched',
+                    matches=int(request.form.get('matches') or 0),
+                    runs=int(request.form.get('runs') or 0),
+                    average=float(request.form.get('average') or 0),
+                    strike_rate=float(request.form.get('strike_rate') or 0),
+                    highest_score=int(request.form.get('highest_score') or 0),
+                    fifties=int(request.form.get('fifties') or 0),
+                    hundreds=int(request.form.get('hundreds') or 0),
+                    wickets=int(request.form.get('wickets') or 0),
+                    economy=float(request.form.get('economy') or 0),
+                    best_bowling=request.form.get('best_bowling') or '0/0'
+                )
+            
+            db.session.add(player)
+            db.session.commit()
 
             flash('Player added successfully', 'success')
-            return redirect(url_for('players'))
+            return redirect(url_for('add_player'))
         except Exception as e:
+            db.session.rollback()
             flash(f'Error adding player: {str(e)}', 'error')
             return redirect(url_for('add_player'))
 
@@ -222,151 +223,102 @@ def add_team():
                 flash('Team name is required!', 'error')
                 return redirect(url_for('add_player'))
 
-            teams = load_teams()
-                
-            # Check if team already exists
-            if any(t['name'].lower() == team_name.lower() for t in teams):
+            if Team.query.filter(func.lower(Team.name) == func.lower(team_name)).first():
                 flash('Team already exists!', 'error')
                 return redirect(url_for('add_player'))
-                
-            new_team = {
-                'name': team_name,
-                'owner_name': owner_name,
-                'purse': 100.0,
-                'players': {
-                    'batsmen': [],
-                    'bowlers': [],
-                    'wicketkeepers': [],
-                    'allrounders': []
-                },
-                'stats': {
-                    'batsmen_count': 0,
-                    'bowlers_count': 0,
-                    'wicketkeepers_count': 0,
-                    'allrounders_count': 0
-                }
-            }
 
-            teams.append(new_team)
-            save_teams(teams)
+            # Calculate lowest available ID (Gap Filling)
+            # Fetch all existing IDs
+            existing_ids = [t.id for t in Team.query.all()]
+            new_id = 1
+            while new_id in existing_ids:
+                new_id += 1
+            
+            print(f"DEBUG: Calculated Gap-Filling Team ID: {new_id}")
+                
+            new_team = Team(
+                id=new_id,
+                name=team_name,
+                owner_name=owner_name,
+                purse=100.0
+            )
+            
+            db.session.add(new_team)
+            db.session.commit()
 
             flash('Team added successfully', 'success')
             return redirect(url_for('add_player'))
         except Exception as e:
+            db.session.rollback()
             flash(f'Error adding team: {str(e)}', 'error')
             return redirect(url_for('add_player'))
 
-@app.route('/api/player/<category>/<player_name>/action', methods=['POST'])
-def player_action(category, player_name):
+@app.route('/api/player/<int:player_id>/action', methods=['POST'])
+def player_action(player_id):
     try:
-        action = request.json.get('action')
-        team_name = request.json.get('team')
-        price = float(request.json.get('price', 0))
+        data = request.json
+        action = data.get('action')
+        team_name = data.get('team')
+        price = float(data.get('price', 0))
 
-        # Ensure the minimum selling price is 2
         if action == 'sold' and price < 2:
             return jsonify({'error': 'Minimum selling price is 2'}), 400
 
-        players = load_players()
-        teams = load_teams()
+        # Look up player directly by ID
+        player = db.session.get(Player, player_id)
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
 
         if action == 'sold':
-            # Find the player and team
-            player = next((p for p in players['available_players'][category] 
-                        if p['name'] == player_name), None)
-            team = next((t for t in teams if t['name'] == team_name), None)
-
-            if not player:
-                return jsonify({'error': 'Player not found'}), 404
+            team = Team.query.filter_by(name=team_name).first()
             if not team:
                 return jsonify({'error': 'Team not found'}), 404
 
-            if team['purse'] >= price:
-                # Update player status and store the selling price
-                player['status'] = 'sold'
-                player['selling_price'] = price
-                player['sold_to'] = team_name
-
-                # Update the same player in all_players
-                all_player = next((p for p in players['all_players'][category] 
-                                if p['name'] == player_name), None)
-                if all_player:
-                    all_player['status'] = 'sold'
-                    all_player['selling_price'] = price
-                    all_player['sold_to'] = team_name
-
-                # Add to team
-                team['players'][category].append(player)
-                team['purse'] -= price
-                team['stats'][f'{category}_count'] += 1
-
-                save_players(players)
-                save_teams(teams)
+            if team.purse >= price:
+                player.status = 'sold'
+                player.selling_price = price
+                player.team_id = team.id
+                player.team_name = team.name # Denormalized
+                
+                team.purse -= price
+                
+                db.session.commit()
                 return jsonify({'success': True})
             return jsonify({'error': 'Insufficient team budget'}), 400
 
         elif action == 'unsold':
-            # Update player status in both available_players and all_players
-            player = next((p for p in players['available_players'][category] 
-                        if p['name'] == player_name), None)
-            all_player = next((p for p in players['all_players'][category] 
-                            if p['name'] == player_name), None)
-
-            if player:
-                player['status'] = 'unsold'
-                player.pop('selling_price', None)  # Remove selling price if it exists
-            if all_player:
-                all_player['status'] = 'unsold'
-                all_player.pop('selling_price', None)  # Remove selling price if it exists
-
-            save_players(players)
+            player.status = 'unsold'
+            player.selling_price = None
+            player.team_id = None
+            player.team_name = None # Clear denormalized
+            db.session.commit()
             return jsonify({'success': True})
 
         return jsonify({'error': 'Invalid action'}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/team/<team_name>/reset', methods=['POST'])
 def reset_team(team_name):
     try:
-        teams = load_teams()
-        players = load_players()
-
-        # Find the team to reset
-        team = next((t for t in teams if t['name'] == team_name), None)
+        team = Team.query.filter_by(name=team_name).first()
         if not team:
             return jsonify({'error': 'Team not found'}), 404
 
-        # Restore the team's purse to its original value (assuming original purse is 100M)
-        original_purse = 100  # Change this to the actual original purse value if different
-        team['purse'] = original_purse
-
-        # Move all players back to the available players list and reset their status
-        for category in ['batsmen', 'bowlers', 'wicketkeepers', 'allrounders']:
-            for player in team['players'][category]:
-                # Update player in available players
-                avail_player = next((p for p in players['available_players'][category] 
-                                   if p['name'] == player['name']), None)
-                if avail_player:
-                    avail_player['status'] = 'untouched'
-                    avail_player.pop('selling_price', None)
-                    avail_player.pop('sold_to', None)
-                else:
-                    player['status'] = 'untouched'
-                    player.pop('selling_price', None)
-                    player.pop('sold_to', None)
-                    players['available_players'][category].append(player)
-            # Clear the team's players in this category
-            team['players'][category] = []
-            # Reset the player count for this category
-            team['stats'][f'{category}_count'] = 0
-
-        # Save the updated data
-        save_teams(teams)
-        save_players(players)
-
+        team.purse = 100.0
+        
+        # Reset all players in this team
+        for player in team.all_players:
+            player.status = 'untouched'
+            player.selling_price = None
+            player.team_id = None # Removes from team
+            player.team_name = None # Clear denormalized
+            
+        db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/team/<team_name>/update-purse', methods=['POST'])
@@ -378,15 +330,12 @@ def update_team_purse(team_name):
         if amount < 0:
             return jsonify({'error': 'Amount must be non-negative'}), 400
 
-        teams = load_teams()
-        team = next((t for t in teams if t['name'] == team_name), None)
-        
+        team = Team.query.filter_by(name=team_name).first()
         if not team:
             return jsonify({'error': 'Team not found'}), 404
 
-        team['purse'] = amount
-        save_teams(teams)
-        
+        team.purse = amount
+        db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -394,46 +343,21 @@ def update_team_purse(team_name):
 @app.route('/api/team/<team_name>/delete', methods=['POST'])
 def delete_team(team_name):
     try:
-        teams = load_teams()
-        # Filter out the team to delete
-        teams = [t for t in teams if t['name'] != team_name]
-        save_teams(teams)
+        team = Team.query.filter_by(name=team_name).first()
+        if team:
+            # Release all players first
+            for p in team.all_players:
+                p.status = 'untouched'
+                p.selling_price = None
+                p.team_id = None
+                p.team_name = None # Clear denormalized
+            
+            db.session.delete(team)
+            db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/remove-player-all', methods=['POST'])
-def remove_player_all():
-    data = request.json
-    player_name = data.get('player')
-    category = data.get('category')
-    
-    players = load_players()
-    teams = load_teams()
-    
-    # Find the player in all_players
-    player = next((p for p in players['all_players'].get(category, []) if p['name'] == player_name), None)
-    if not player:
-        return jsonify({'error': 'Player not found'}), 404
-
-    # Check if player is in a team
-    for team in teams:
-        for cat in ['batsmen', 'bowlers', 'wicketkeepers', 'allrounders']:
-            team_players = team['players'].get(cat, [])
-            for p in team_players:
-                if p['name'] == player_name:
-                    team['purse'] += p.get('selling_price', p['base_price'])
-                    team['players'][cat] = [pl for pl in team_players if pl['name'] != player_name]
-                    team['stats'][f'{cat}_count'] -= 1
-                    save_teams(teams)
-                    break
-
-    # Remove from all_players and available_players
-    players['all_players'][category] = [p for p in players['all_players'][category] if p['name'] != player_name]
-    players['available_players'][category] = [p for p in players['available_players'][category] if p['name'] != player_name]
-    
-    save_players(players)
-    return jsonify({'success': True})
 
 @app.route('/api/remove-player', methods=['POST'])
 def remove_player():
@@ -443,51 +367,52 @@ def remove_player():
         player_name = data.get('player')
         category = data.get('category')
 
-        if not all([team_name, player_name, category]):
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        teams = load_teams()
-        players = load_players()
-
-        team = next((t for t in teams if t['name'] == team_name), None)
+        team = Team.query.filter_by(name=team_name).first()
         if not team:
             return jsonify({'error': 'Team not found'}), 404
 
-        # Find player in team
-        player = next((p for p in team['players'][category] 
-                    if p['name'] == player_name), None)
+        player = Player.query.filter_by(name=player_name, team_id=team.id).first()
         if not player:
             return jsonify({'error': 'Player not found in team'}), 404
 
-        # Increase team's purse by the selling price (stored in the player's data)
-        selling_price = player.get('selling_price', player['base_price'])  # Default to base_price if selling_price is not set
-        team['purse'] += selling_price
-
-        # Remove from team
-        team['players'][category] = [
-            p for p in team['players'][category]
-            if p['name'] != player_name
-        ]
-        team['stats'][f'{category}_count'] -= 1
-
-        # Update player in available players
-        avail_player = next((p for p in players['available_players'][category] 
-                           if p['name'] == player_name), None)
-        if avail_player:
-            avail_player['status'] = 'untouched'
-            avail_player.pop('selling_price', None)
-            avail_player.pop('sold_to', None)
-        else:
-            # Fallback if not found (shouldn't happen with new logic, but safe to keep)
-            player['status'] = 'untouched'
-            player.pop('selling_price', None)
-            player.pop('sold_to', None)
-            players['available_players'][category].append(player)
-
-        save_teams(teams)
-        save_players(players)
+        selling_price = player.selling_price or player.base_price
+        team.purse += selling_price
+        
+        player.status = 'untouched'
+        player.selling_price = None
+        player.team_id = None
+        player.team_name = None # Clear denormalized
+        
+        db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/remove-player-all', methods=['POST'])
+def remove_player_all():
+    try:
+        data = request.json
+        player_name = data.get('player')
+
+        # Find player by name (polymorphic)
+        player = Player.query.filter_by(name=player_name).first()
+        
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+
+        # If player is sold, refund the team first
+        if player.status == 'sold' and player.team_id:
+             team = db.session.get(Team, player.team_id)
+             if team:
+                 team.purse += (player.selling_price or player.base_price)
+
+        db.session.delete(player)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update-player', methods=['POST'])
@@ -498,52 +423,50 @@ def update_player():
         original_name = data.get('original_name')
         updates = data.get('updates', {})
 
-        if not all([category, original_name, updates]):
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        players = load_players()
-        teams = load_teams()
-        
-        updated = False
-
-        # 1. Update in all_players
-        if category in players['all_players']:
-            for p in players['all_players'][category]:
-                if p['name'] == original_name:
-                    p.update(updates)
-                    # If name changed, we need to be careful, but for now assuming name might change
-                    updated = True
-                    break
-
-        # 2. Update in available_players
-        if category in players['available_players']:
-            for p in players['available_players'][category]:
-                if p['name'] == original_name:
-                    p.update(updates)
-                    updated = True
-                    break
-
-        # 3. Update in teams
-        for team in teams:
-            if category in team['players']:
-                for p in team['players'][category]:
-                    if p['name'] == original_name:
-                        # Preserve selling price if it exists and not in updates
-                        selling_price = p.get('selling_price')
-                        p.update(updates)
-                        if selling_price:
-                            p['selling_price'] = selling_price
-                        updated = True
-                        break
-
-        if updated:
-            save_players(players)
-            save_teams(teams)
-            return jsonify({'success': True})
-        else:
+        # Query generic player first to check existence
+        player = Player.query.filter_by(name=original_name).first() # polymorphic load
+        if not player:
             return jsonify({'error': 'Player not found'}), 404
+            
+        if player.type != category:
+             return jsonify({'error': 'Category mismatch'}), 400
+
+        # Update base fields if any (currently none in updates dict usually)
+        
+        # Update subclass specific fields
+        # Define allowed fields per category
+        allowed_fields = {
+            'batsmen': ['matches', 'runs', 'average', 'strike_rate', 'highest_score', 'fifties', 'hundreds'],
+            'bowlers': ['matches', 'wickets', 'economy', 'best_bowling'],
+            'wicketkeepers': ['matches', 'runs', 'average', 'strike_rate', 'highest_score', 'fifties', 'hundreds'],
+            'allrounders': ['matches', 'runs', 'average', 'strike_rate', 'highest_score', 'fifties', 'hundreds', 'wickets', 'economy', 'best_bowling']
+        }
+        
+        # Helper to unpack updates - frontend sends {name: "foo", stats: {runs: 10, ...}}
+        stats_updates = updates.get('stats', {})
+        
+        # Update name if present
+        if 'name' in updates:
+            player.name = updates['name']
+            
+            # Update denormalized player_name in subclass
+            # Polymorphic load means 'player' is already the instance of Batsman/Bowler etc.
+            if hasattr(player, 'player_name'):
+                player.player_name = updates['name']
+
+        fields = allowed_fields.get(category, [])
+        for field in fields:
+            # Check in stats object first, then top-level updates (backward compat)
+            if field in stats_updates:
+                setattr(player, field, stats_updates[field])
+            elif field in updates:
+                setattr(player, field, updates[field])
+        
+        db.session.commit()
+        return jsonify({'success': True})
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/team/<team_name>/update', methods=['POST'])
@@ -553,64 +476,42 @@ def update_team(team_name):
         new_name = data.get('name')
         new_owner = data.get('owner_name')
         
-        if not new_name:
-            return jsonify({'error': 'Team name is required'}), 400
-            
-        teams = load_teams()
-        team = next((t for t in teams if t['name'] == team_name), None)
-        
+        team = Team.query.filter_by(name=team_name).first()
         if not team:
             return jsonify({'error': 'Team not found'}), 404
             
-        # If name is changing, check for duplicates
         if new_name != team_name:
-            if any(t['name'].lower() == new_name.lower() for t in teams):
+             if Team.query.filter(func.lower(Team.name) == func.lower(new_name)).first():
                 return jsonify({'error': 'Team name already exists'}), 400
-                
-        # Update team details
-        team['name'] = new_name
-        team['owner_name'] = new_owner
+             
+             # Sync new team name to all players
+             for p in team.all_players:
+                 p.team_name = new_name
         
-        # If name changed, update references in players
-        if new_name != team_name:
-            players = load_players()
-            
-            # Update sold_to in all_players
-            for category in players['all_players']:
-                for p in players['all_players'][category]:
-                    if p.get('sold_to') == team_name:
-                        p['sold_to'] = new_name
-                        
-            # Update sold_to in available_players
-            for category in players['available_players']:
-                for p in players['available_players'][category]:
-                    if p.get('sold_to') == team_name:
-                        p['sold_to'] = new_name
-
-            # Update sold_to in team's own player list (if stored there)
-            # Note: We are updating the team object in 'teams' list, but we also need to check if players inside it have sold_to
-            # Usually they do if we added them via player_action
-            for category in team['players']:
-                for p in team['players'][category]:
-                    if p.get('sold_to') == team_name:
-                        p['sold_to'] = new_name
-                        
-            save_players(players)
-            
-        save_teams(teams)
+        team.name = new_name
+        team.owner_name = new_owner
+        
+        # No need to manually update players Sold To if using Relation/ForeignKey?
+        # status="sold", team_id=X. 
+        # When displaying, we use player.team.name.
+        # So renaming team AUTOMATICALLY reflects in all players!
+        # This is the beauty of Relational DBs!
+        
+        db.session.commit()
         return jsonify({'success': True})
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/evaluation')
 def evaluation():
     """Team evaluation page showing analysis of all teams"""
-    teams_data = load_teams()
+    teams_data = Team.query.all()
     evaluations = {}
 
     for team in teams_data:
-        evaluations[team['name']] = evaluate_team(team)
+        evaluations[team.name] = evaluate_team(team)
 
     return render_template('evaluation.html', teams=teams_data, evaluations=evaluations)
 
@@ -619,7 +520,16 @@ def evaluate_team(team):
     score = 0
     strengths = []
     weaknesses = []
-
+    
+    # We can use team.stats property we created in models.py
+    stats = team.stats # This gives counts
+    
+    # But we need deeper stats (avg runs etc)
+    # So we need to iterate players again
+    
+    # Reuse the logic from before but adapt dictionary access to object access
+    # player['stats']['runs'] -> player.stats['runs']
+    
     # Initialize stats for evaluation
     total_runs_batsmen = 0
     total_runs_allrounders = 0
@@ -648,36 +558,43 @@ def evaluate_team(team):
     wicketkeepers_count = 0
 
     # Calculate stats for each category
-    for category in ['batsmen', 'bowlers', 'wicketkeepers', 'allrounders']:
-        for player in team['players'][category]:
-            total_matches += player['stats']['matches']
-            if category == 'batsmen':
-                total_runs_batsmen += player['stats']['runs']
-                total_average_batsmen += player['stats']['average']
-                total_strike_rate_batsmen += player['stats']['strike_rate']
-                total_fifties_batsmen += player['stats']['fifties']
-                total_hundreds_batsmen += player['stats']['hundreds']
-                batsmen_count += 1
-            elif category == 'wicketkeepers':
-                total_runs_wicketkeepers += player['stats']['runs']
-                total_average_wicketkeepers += player['stats']['average']
-                total_strike_rate_wicketkeepers += player['stats']['strike_rate']
-                total_fifties_wicketkeepers += player['stats']['fifties']
-                total_hundreds_wicketkeepers += player['stats']['hundreds']
-                wicketkeepers_count += 1
-            elif category == 'allrounders':
-                total_runs_allrounders += player['stats']['runs']
-                total_average_allrounders += player['stats']['average']
-                total_strike_rate_allrounders += player['stats']['strike_rate']
-                total_fifties_allrounders += player['stats']['fifties']
-                total_hundreds_allrounders += player['stats']['hundreds']
-                total_wickets_allrounders += player['stats']['wickets']
-                total_economy_allrounders += player['stats']['economy']
-                allrounders_count += 1
-            elif category == 'bowlers':
-                total_wickets_bowlers += player['stats']['wickets']
-                total_economy_bowlers += player['stats']['economy']
-                bowlers_count += 1
+    # Iterate through team.all_players relationship
+    for player in team.all_players:
+        # category is stored in type column but available as attribute if needed, 
+        # or we check instance type. Polymorphic query returns specific instances!
+        
+        # However, for simplicity and compatibility with existing logic:
+        category = player.type # 'batsmen', 'bowlers' etc.
+        
+        total_matches += getattr(player, 'matches', 0) or 0
+        
+        if category == 'batsmen':
+            total_runs_batsmen += getattr(player, 'runs', 0) or 0
+            total_average_batsmen += getattr(player, 'average', 0) or 0
+            total_strike_rate_batsmen += getattr(player, 'strike_rate', 0) or 0
+            total_fifties_batsmen += getattr(player, 'fifties', 0) or 0
+            total_hundreds_batsmen += getattr(player, 'hundreds', 0) or 0
+            batsmen_count += 1
+        elif category == 'wicketkeepers':
+            total_runs_wicketkeepers += getattr(player, 'runs', 0) or 0
+            total_average_wicketkeepers += getattr(player, 'average', 0) or 0
+            total_strike_rate_wicketkeepers += getattr(player, 'strike_rate', 0) or 0
+            total_fifties_wicketkeepers += getattr(player, 'fifties', 0) or 0
+            total_hundreds_wicketkeepers += getattr(player, 'hundreds', 0) or 0
+            wicketkeepers_count += 1
+        elif category == 'allrounders':
+            total_runs_allrounders += getattr(player, 'runs', 0) or 0
+            total_average_allrounders += getattr(player, 'average', 0) or 0
+            total_strike_rate_allrounders += getattr(player, 'strike_rate', 0) or 0
+            total_fifties_allrounders += getattr(player, 'fifties', 0) or 0
+            total_hundreds_allrounders += getattr(player, 'hundreds', 0) or 0
+            total_wickets_allrounders += getattr(player, 'wickets', 0) or 0
+            total_economy_allrounders += getattr(player, 'economy', 0) or 0
+            allrounders_count += 1
+        elif category == 'bowlers':
+            total_wickets_bowlers += getattr(player, 'wickets', 0) or 0
+            total_economy_bowlers += getattr(player, 'economy', 0) or 0
+            bowlers_count += 1
 
     # Calculate averages
     avg_runs_batsmen = total_runs_batsmen / batsmen_count if batsmen_count > 0 else 0
@@ -768,7 +685,8 @@ def evaluate_team(team):
 
     # Cap the score at 100
     score = min(score, 100)
-
+    
+    # Return structure matching original format stats
     return {
         'score': score,
         'grade': 'A+' if score >= 90 else 'A' if score >= 80 else 'B+' if score >= 70 else 'B' if score >= 60 else 'C' if score >= 50 else 'C+' if score >= 40 else 'D',
@@ -805,6 +723,7 @@ def evaluate_team(team):
         }
     }
 
-
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)

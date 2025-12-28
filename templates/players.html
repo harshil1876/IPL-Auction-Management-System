@@ -52,7 +52,7 @@
                         </thead>
                         <tbody>
                             {% for player in players[category] %}
-                            <tr data-category="{{ category }}" data-player="{{ player|tojson|forceescape }}">
+                            <tr data-category="{{ category }}" data-player="{{ player.to_dict()|tojson|forceescape }}">
                                 <td>{{ player.player_number }}</td>
                                 <td>
                                     <a href="#" class="text-decoration-none"
@@ -76,7 +76,8 @@
                                 {% endif %}
                                 <td>
                                     <button class="btn btn-sm btn-primary me-1" data-category="{{ category }}"
-                                        data-player="{{ player|tojson|forceescape }}" onclick="openUpdateModal(this)">
+                                        data-player="{{ player.to_dict()|tojson|forceescape }}"
+                                        onclick="openUpdateModal(this)">
                                         Update
                                     </button>
                                     <button class="btn btn-sm btn-danger"

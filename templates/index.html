@@ -34,6 +34,7 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <select class="form-select" id="playerCategory" onchange="filterPlayers()">
+                            <option value="all">All Categories</option>
                             <option value="batsmen">Batsmen</option>
                             <option value="bowlers">Bowlers</option>
                             <option value="wicketkeepers">Wicket Keepers</option>
@@ -68,7 +69,7 @@
                                 {% for category, category_players in players.items() %}
                                 {% for player in category_players %}
                                 <tr class="player-row" data-category="{{ category }}" data-status="{{ player.status }}"
-                                    data-player="{{ player|tojson|forceescape }}">
+                                    data-player="{{ player.to_dict()|tojson|forceescape }}">
                                     <td>{{ player.player_number }}</td>
                                     <td>{{ player.name }}</td>
                                     <td>₹{{ player.base_price }}Cr</td>
@@ -87,10 +88,9 @@
                                     </td>
                                     <td>
                                         {% if player.status == 'sold' %}
-                                        <span class="badge bg-success">Sold to {{ player.sold_to }}</span>
+                                        <span class="badge bg-success">Sold to {{ player.team.name }}</span>
                                         {% else %}
-                                        <button class="btn btn-sm btn-success"
-                                            onclick="sellPlayer('{{ category }}', '{{ player.name }}')">
+                                        <button class="btn btn-sm btn-success" onclick="sellPlayer('{{ player.id }}')">
                                             Sell
                                         </button>
                                         {% endif %}
@@ -185,8 +185,7 @@
             </div>
             <div class="modal-body">
                 <form id="sellPlayerForm">
-                    <input type="hidden" id="playerCategory">
-                    <input type="hidden" id="playerName">
+                    <input type="hidden" id="playerId">
                     <div class="mb-3">
                         <label for="sellingPrice" class="form-label">Selling Price (in M)</label>
                         <input type="number" class="form-control" id="sellingPrice" required min="2" step="0.1">
@@ -231,7 +230,7 @@
         const rows = document.querySelectorAll('.player-row');
 
         rows.forEach(row => {
-            const matchCategory = row.dataset.category === category;
+            const matchCategory = category === 'all' || row.dataset.category === category;
             const matchStatus = status === 'all' || row.dataset.status === status;
             row.style.display = matchCategory && matchStatus ? '' : 'none';
         });
@@ -340,31 +339,31 @@
         // Store player info in modal for action buttons
         const modal = document.getElementById('playerSelectionModal');
         modal.dataset.category = category;
-        modal.dataset.playerName = player.name;
+        modal.dataset.playerId = player.id; // Store ID
+        modal.dataset.playerName = player.name; // Keep name for display if needed
 
         new bootstrap.Modal(modal).show();
     }
 
     function markSold() {
         const modal = document.getElementById('playerSelectionModal');
-        const category = modal.dataset.category;
-        const playerName = modal.dataset.playerName;
+        const category = modal.dataset.category; // Kept for other logic if needed, but not for API
+        const playerId = modal.dataset.playerId;
 
-        if (!category || !playerName) return;
+        if (!playerId) return;
 
         bootstrap.Modal.getInstance(modal).hide();
-        sellPlayer(category, playerName);
+        sellPlayer(playerId);
     }
 
     function markUnsold() {
         const modal = document.getElementById('playerSelectionModal');
-        const category = modal.dataset.category;
-        const playerName = modal.dataset.playerName;
+        const playerId = modal.dataset.playerId;
 
-        if (!category || !playerName) return;
+        if (!playerId) return;
 
         if (confirm('Mark this player as unsold?')) {
-            fetch(`/api/player/${category}/${playerName}/action`, {
+            fetch(`/api/player/${playerId}/action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'unsold' })
@@ -386,20 +385,22 @@
         }
     }
 
-    function sellPlayer(category, playerName) {
-        document.getElementById('playerCategory').value = category;
-        document.getElementById('playerName').value = playerName;
+    function sellPlayer(playerId) {
+        document.getElementById('playerId').value = playerId; // Need hidden input for ID
+        // Clear previous price/team inputs
+        document.getElementById('sellingPrice').value = '';
+        document.getElementById('teamSelect').selectedIndex = 0;
+
         new bootstrap.Modal(document.getElementById('sellPlayerModal')).show();
     }
 
     document.getElementById('sellPlayerForm').addEventListener('submit', function (e) {
         e.preventDefault();
-        const category = document.getElementById('playerCategory').value;
-        const playerName = document.getElementById('playerName').value;
+        const playerId = document.getElementById('playerId').value;
         const price = parseFloat(document.getElementById('sellingPrice').value);
         const team = document.getElementById('teamSelect').value;
 
-        fetch(`/api/player/${category}/${playerName}/action`, {
+        fetch(`/api/player/${playerId}/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

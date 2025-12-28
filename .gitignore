@@ -1,0 +1,11 @@
+# Environment Variables
+.env
+
+# Python
+__pycache__/
+
+# Flask
+instance/
+
+# Database
+*.db
